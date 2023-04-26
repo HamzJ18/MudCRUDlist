@@ -1,0 +1,117 @@
+﻿@page "/server"
+
+@using System.Net.Http.Json
+@using MudCRUDlist.Shared
+@using MudCRUDlist.Shared.Models
+@using MudCRUDlist.Client.Services.Interface
+@inject MudBlazor.ISnackbar snackBar
+@inject HttpClient _httpClient
+
+<MudTable ServerData="@(new Func<TableState, Task<TableData<UserTable>>>(ServerReload))"
+          Dense="true" Hover="true" @ref="table">
+    
+    <ToolBarContent>
+        <MudText Typo="Typo.h6">User List</MudText>
+        <MudSpacer />
+        <MudTextField T="string" ValueChanged="@(s=>OnSearch(s))"
+                      Placeholder="Search" Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      IconSize="Size.Medium" Class="mt-0">
+        </MudTextField>
+         
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTh>
+            <MudTableSortLabel SortLabel="UserId" T="UserTable">UserId</MudTableSortLabel>
+        </MudTh>
+        <MudTh>
+            <MudTableSortLabel SortLabel="PersonId" T="UserTable">Person  ID</MudTableSortLabel>
+        </MudTh>
+        <MudTh>
+            <MudTableSortLabel SortLabel="FirstName" T="UserTable">First Name</MudTableSortLabel>
+        </MudTh>
+        <MudTh><MudTableSortLabel SortLabel="LastName" T="UserTable">Last Name</MudTableSortLabel>
+        </MudTh>
+    </HeaderContent>
+
+    <RowTemplate>
+        <MudTd DataLabel="UserId">@context.UserId</MudTd>
+        <MudTd DataLabel="PersonID">@context.PersonId</MudTd>
+        <MudTd DataLabel="FirstName">@context.FirstName</MudTd>
+        <MudTd DataLabel="LastName">@context.LastName</MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <MudText>No matching records found</MudText>
+    </NoRecordsContent>
+    <LoadingContent>
+        <MudText>Loading...</MudText>
+    </LoadingContent>
+
+    <PagerContent>
+        <MudTablePager />
+    </PagerContent>
+</MudTable>
+
+
+
+@code {
+    private int totalItems;
+    private string searchString = null;
+    private UserTable selectedItem1 = null;
+    [Inject]
+    public IUserTableService usertableservice { get; set; }
+    private IEnumerable<UserTable>? items = new List<UserTable>();
+    private MudTable<UserTable> table;
+    private IEnumerable<UserTable> pagedData;
+
+
+    private async Task<TableData<UserTable>> ServerReload(TableState state)
+    {
+        IEnumerable<UserTable> data = await usertableservice.GetUsers();
+        items = data.ToList();
+        await Task.Delay(300);
+
+        data = data.Where(entity =>
+        {
+            if (string.IsNullOrWhiteSpace(searchString))
+                return true;
+            if (entity.UserId.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+                return true;
+            if ($"{entity.UserId} {entity.PersonId} {entity.FirstName} {entity.LastName}".Contains(searchString))
+                return true;
+            return false;
+        }).ToArray();
+        totalItems = data.Count();
+        switch (state.SortLabel)
+        {
+            case "UserId":
+                data = data.OrderByDirection(state.SortDirection, o => o.UserId);
+                break;
+            case "PersonId":
+                data = data.OrderByDirection(state.SortDirection, o => o.PersonId);
+                break;
+            case "FirstName":
+                data = data.OrderByDirection(state.SortDirection, o => o.FirstName);
+                break;
+            case "LastName":
+                data = data.OrderByDirection(state.SortDirection, o => o.LastName);
+                break;
+            
+        }
+
+        pagedData = data.Skip(state.Page * state.PageSize).Take(state.PageSize).ToArray();
+        return new TableData<UserTable>() { TotalItems = totalItems, Items = pagedData };
+    }
+
+    private void OnSearch(string text)
+    {
+        searchString = text;
+        table.ReloadServerData();
+    }
+}
+
+
+
+
+
+    
